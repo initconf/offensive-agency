@@ -1,0 +1,33 @@
+[package]
+name = offensive-agency
+summary = Detect offensive AI agent infrastructure and activity (offensive.agency / ONYPHE feed) on Zeek clusters.
+description =
+    Pulls the free offensive.agency feed (data by ONYPHE) of Internet-exposed
+    offensive AI agent consoles -- ARTEX, CyberStrikeAI, PentAGI, HexStrike,
+    RedAmon, Strix and others -- on the manager every 30 minutes (conditional
+    ETag requests), filters it for precision (confirmed detections only, no
+    shared CDN fronts, short age limit for cloud addresses) and syncs it into
+    the Intel framework, which distributes it to all workers.
+    .
+    On top of the IP/domain matches it ships behavioural signatures taken from
+    each agent's documented traces (User-Agents, C2/implant headers, payload
+    markers, update and telemetry endpoints, OAST callback lookups). All
+    findings are decided once, on the manager, into direction-aware notices
+    and an offensive_agency.log, deduplicated per logical finding.
+    .
+    All tunables are Config framework options (no redef needed). An opt-in
+    LBL site add-on (offensive-agency/lbl) adds site values and notice actions.
+version = 1.0.0
+script_dir = scripts
+tags =
+    intel
+    threat intelligence
+    offensive ai
+    ai agents
+    cluster
+    notice
+depends =
+    zeek >=8.0.0
+external_depends =
+    curl >=7.68.0
+test_command = cd tests && btest

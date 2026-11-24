@@ -1,0 +1,55 @@
+# offensive-agency configuration (Zeek Config framework).
+#
+# Copy this file, edit it, and register it in your local.zeek:
+#
+#     @load offensive-agency
+#     redef Config::config_files += { "/path/to/offensive-agency.cfg" };
+#
+# The file is re-read automatically when it changes: no Zeek restart is
+# needed. In a cluster, the manager reads it and pushes the values to every
+# node.
+#
+# Format: one "<option-name> <value>" per line.
+#   intervals - seconds (1800 = 30 min)
+#   sets      - comma separated, no spaces (10.0.0.0/8,192.168.0.0/16)
+#   booleans  - T or F
+# Every line is optional; the values shown are the defaults.
+
+# --- Feed --------------------------------------------------------------------
+#OffensiveAgency::feed_url          https://www.offensive.agency/api/v1/feeds/hosts.ndjson
+# Read a local copy instead of fetching (air-gapped sensors; refresh it by cron
+# with: curl -sS -o hosts.ndjson https://www.offensive.agency/api/v1/feeds/hosts.ndjson)
+#OffensiveAgency::feed_file         /var/lib/zeek/offensive-agency/hosts.ndjson
+#OffensiveAgency::refresh_interval  1800
+#OffensiveAgency::fetch_timeout     120
+#OffensiveAgency::state_dir         offensive-agency-state
+#OffensiveAgency::curl_path         curl
+
+# --- Noise controls ----------------------------------------------------------
+# "confirmed" = two independent fingerprint families; "probable" = one.
+#OffensiveAgency::min_level         confirmed
+#OffensiveAgency::include_cdn_ips   F
+# Ages are measured against the feed's newest observation (604800 = 7 days).
+#OffensiveAgency::max_ip_age        604800
+#OffensiveAgency::max_cloud_ip_age  259200
+
+# Local hosts to ignore completely (your scanners, pentest boxes, researchers).
+#OffensiveAgency::ignore_hosts      192.0.2.10/32,192.0.2.64/26
+# Feed IPs/domains never to watch.
+#OffensiveAgency::ignore_indicators 198.51.100.7,agent.example.com
+# Inbound contacts from listed hosts to these ports are logged, not noticed.
+#OffensiveAgency::inbound_ignore_ports 25/tcp
+# Behavioural signature ids to disable (see scripts/traces.zeek).
+#OffensiveAgency::disabled_signatures truncated-chrome-ua,artex-php-boundary
+
+# --- Detection paths ---------------------------------------------------------
+#OffensiveAgency::watch_ips         T
+#OffensiveAgency::watch_domains     T
+#OffensiveAgency::watch_behaviour   T
+#OffensiveAgency::watch_oast        T
+
+# --- Alerting ----------------------------------------------------------------
+# Same finding is logged and noticed once per window (86400 = 1 day).
+#OffensiveAgency::dedup_interval    86400
+#OffensiveAgency::stale_after       172800
+#OffensiveAgency::failures_before_notice 3
