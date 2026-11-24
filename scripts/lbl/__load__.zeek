@@ -7,8 +7,11 @@
 ##!     @load offensive-agency/lbl
 ##!
 ##! It does two things and nothing else:
-##!   1. Registers lbl.cfg (next to this file) with the Config framework:
-##!      LBL's scanner allowlist and never-drop nets.
+##!   1. Defines the options a site config file sets (scanner allowlist,
+##!      never-drop nets). The package does NOT register any config file:
+##!      it ships only lbl.cfg.example (placeholder values). The real site
+##!      file lives outside the repo and is registered in local.zeek with
+##!          redef Config::config_files += { "/path/to/lbl.cfg" };
 ##!      Site-local overrides (e.g. turning on drops) go in a SEPARATE
 ##!      config file, such as /YURT/feeds/zeek-config/offensive-agency.cfg,
 ##!      added to Config::config_files in local.zeek. Never set the same
@@ -42,8 +45,6 @@ export {
 		OffensiveAgency::Feed_Problem,
 	};
 }
-
-redef Config::config_files += { fmt("%s/lbl.cfg", @DIR) };
 
 const package_notes: set[Notice::Type] = {
 	Outbound_To_Agent_Host, Inbound_From_Agent_Host, Agent_Domain_Contact,

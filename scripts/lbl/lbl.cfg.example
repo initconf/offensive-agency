@@ -1,0 +1,35 @@
+# offensive-agency: site configuration template (Zeek Config framework).
+#
+# Copy this file somewhere outside the package (e.g. /etc/zeek/lbl.cfg),
+# fill in your own values, and register it in local.zeek:
+#
+#     redef Config::config_files += { "/etc/zeek/lbl.cfg" };
+#
+# Edits take effect without a Zeek restart.
+# Format: "<option> <value>"; intervals in seconds; sets comma separated.
+# The addresses below are RFC 5737 documentation placeholders: replace them.
+
+# Poll every 30 min (conditional GET, so a poll with no news is one 304).
+OffensiveAgency::refresh_interval	1800
+# state_dir is host-specific (must be writable by the Zeek user, and should
+# survive restarts): set it in the host's override config, not here.
+
+OffensiveAgency::min_level	confirmed
+OffensiveAgency::include_cdn_ips	F
+OffensiveAgency::max_cloud_ip_age	259200
+
+# Authorised scanners: their probes and OAST payloads must not page anyone.
+OffensiveAgency::ignore_hosts	192.0.2.0/27,198.51.100.20/30
+
+# Never drop: your own address space, upstream routers, DR sites, CDNs you
+# depend on, and so on.
+OffensiveAgency::lbl_never_drop_nets	192.0.2.0/24,198.51.100.0/24,203.0.113.0/24
+
+# Dropping (OffensiveAgency::lbl_drop_inbound) is deliberately NOT set here.
+# It defaults to off. To enable it, put
+#
+#     OffensiveAgency::lbl_drop_inbound	T
+#
+# in a separate site override file registered via Config::config_files.
+# Never set the same option in two config files: the Config framework gives
+# no ordering guarantee between files, so whichever is read last would win.

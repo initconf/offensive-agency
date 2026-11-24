@@ -165,13 +165,20 @@ Not loaded by default. At LBL::
         @load offensive-agency
         @load offensive-agency/lbl
 
-It registers ``scripts/lbl/lbl.cfg`` (authorised scanners in ignore_hosts,
-never-drop nets mirrored from scan-NG); host-specific values such as
-``state_dir`` go in a per-host override config file
-and a notice policy: ACTION_ALARM for every finding; ACTION_EMAIL for implant,
+Site settings (authorised scanners in ignore_hosts, never-drop nets) live in
+a config file kept outside the package. The package ships only
+``scripts/lbl/lbl.cfg.example`` with placeholder addresses; copy it, fill it
+in, and register it in local.zeek::
+
+        redef Config::config_files += { "/path/to/lbl.cfg" };
+
+Host-specific values such as ``state_dir`` go in a per-host override config
+file.
+
+The add-on also installs a notice policy: ACTION_ALARM for every finding; ACTION_EMAIL for implant,
 local-listed, running-locally, outbound, domain, OAST and feed problems;
 ACTION_DROP for external inbound sources only when ``lbl_drop_inbound`` is T.
-Set that in a separate site override config file (never in lbl.cfg as well:
+Set that in a separate site override config file (never in the site config file as well:
 the Config framework does not order files). Drops are carried out by the
 existing ``lbl.drop-action.zeek``.
 

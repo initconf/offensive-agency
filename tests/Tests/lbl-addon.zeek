@@ -1,6 +1,6 @@
-# @TEST-DOC: LBL add-on: lbl.cfg is applied through the Config framework, every finding is alarmed, the right ones are emailed, and ACTION_DROP is added only when enabled and only for external inbound sources.
+# @TEST-DOC: LBL add-on: a site config file (here the shipped lbl.cfg.example) is applied through the Config framework, every finding is alarmed, the right ones are emailed, and ACTION_DROP is added only when enabled and only for external inbound sources.
 #
-# Default lbl.cfg: no drops.
+# Example config only: no drops.
 # @TEST-EXEC: zeek -C -r $TRACES/offensive-agency.pcap $PACKAGE/__load__.zeek $PACKAGE/lbl $TEST_FILES/feed-ready.zeek %INPUT
 # @TEST-EXEC: zeek-cut note src actions < notice.log > actions-default.txt
 # @TEST-EXEC: btest-diff actions-default.txt
@@ -15,6 +15,7 @@
 # @TEST-EXEC: ! grep ACTION_DROP actions-drop.txt | grep -q '	10\.'
 
 redef OffensiveAgency::feed_file = getenv("TEST_FILES") + "/feed.ndjson";
+redef Config::config_files += { getenv("PACKAGE") + "/lbl/lbl.cfg.example" };
 
 @TEST-START-FILE drop-on.zeek
 redef Config::config_files += { "drop.cfg" };
