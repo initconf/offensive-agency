@@ -132,6 +132,12 @@ export {
 	## curl binary used for fetching.
 	option curl_path = "curl";
 
+	## HTTP(S) proxy for the fetch, passed to curl as ``-x``, e.g.
+	## "http://proxy.example.org:3128" or "socks5h://127.0.0.1:1080".
+	## Empty (default): connect directly; curl still honours the
+	## https_proxy / no_proxy environment variables in that case.
+	option fetch_proxy = "";
+
 	## Lowest detection level to act on: "confirmed" (two independent
 	## fingerprint families) or "probable" (one).
 	option min_level = "confirmed";

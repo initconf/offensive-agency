@@ -17,13 +17,15 @@
 
 # --- Feed --------------------------------------------------------------------
 #OffensiveAgency::feed_url          https://www.offensive.agency/api/v1/feeds/hosts.ndjson
-# Read a local copy instead of fetching (air-gapped sensors; refresh it by cron
-# with: curl -sS -o hosts.ndjson https://www.offensive.agency/api/v1/feeds/hosts.ndjson)
+# Read a local copy instead of fetching (air-gapped / no-egress managers).
+# Refresh it from cron with tools/fetch-feed.sh (atomic, ETag, optional proxy).
 #OffensiveAgency::feed_file         /var/lib/zeek/offensive-agency/hosts.ndjson
 #OffensiveAgency::refresh_interval  1800
 #OffensiveAgency::fetch_timeout     120
 #OffensiveAgency::state_dir         offensive-agency-state
 #OffensiveAgency::curl_path         curl
+# Fetch through a proxy (curl -x syntax). Empty = direct (or https_proxy env).
+#OffensiveAgency::fetch_proxy       http://proxy.example.org:3128
 
 # --- Noise controls ----------------------------------------------------------
 # "confirmed" = two independent fingerprint families; "probable" = one.

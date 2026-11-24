@@ -203,6 +203,9 @@ function fetch()
 	                 safe_shell_quote(fmt("zeek-offensive-agency/%s", version)),
 	                 safe_shell_quote(tmp_etag), safe_shell_quote(tmp_body));
 
+	if ( fetch_proxy != "" )
+		curl = fmt("%s -x %s", curl, safe_shell_quote(fetch_proxy));
+
 	# Only send the ETag if we still have the body it describes.
 	if ( file_size(etag) > 0 && file_size(body) > 0 )
 		curl = fmt("%s --etag-compare %s", curl, safe_shell_quote(etag));
@@ -246,13 +249,14 @@ function fetch()
 		busy = F;
 		++consecutive_failures;
 		local err = res?$stderr ? join_string_vec(res$stderr, " ") : "";
-		Reporter::warning(fmt("offensive-agency: fetch of %s failed (curl rc=%s http=%s) %s",
-		                      feed_url, rc, code, err));
+		local via = fetch_proxy != "" ? fmt(" via proxy %s", fetch_proxy) : "";
+		Reporter::warning(fmt("offensive-agency: fetch of %s%s failed (curl rc=%s http=%s) %s",
+		                      feed_url, via, rc, code, err));
 
 		if ( consecutive_failures >= failures_before_notice )
 			feed_problem("fetch-failed",
-			             fmt("%d consecutive failures fetching %s (curl rc=%s http=%s); using cached data",
-			                 consecutive_failures, feed_url, rc, code));
+			             fmt("%d consecutive failures fetching %s%s (curl rc=%s http=%s); using cached data",
+			                 consecutive_failures, feed_url, via, rc, code));
 		}
 	}
 
@@ -558,6 +562,7 @@ event zeek_init()
 	Option::set_change_handler("OffensiveAgency::feed_url", on_source_change);
 	Option::set_change_handler("OffensiveAgency::feed_file", on_source_change);
 	Option::set_change_handler("OffensiveAgency::state_dir", on_source_change);
+	Option::set_change_handler("OffensiveAgency::fetch_proxy", on_source_change);
 
 	if ( ! is_authority() )
 		return;
