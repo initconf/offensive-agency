@@ -1,3 +1,7 @@
-scripts/lbl/lbl.cfg
+# Site configs hold real local values: never commit them. Only the
+# *.cfg.example templates (and the btest config) are tracked.
+*.cfg
+!*.cfg.example
+!tests/btest.cfg
 tests/.tmp/
 tests/.btest.failed.dat
