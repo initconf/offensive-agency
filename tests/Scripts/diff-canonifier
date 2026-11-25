@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+#
+# Default canonifier for btest-diff (vendored from Zeek testing/scripts).
+
+$(dirname "$0")/diff-remove-first-timestamp

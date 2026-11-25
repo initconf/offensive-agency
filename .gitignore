@@ -1,2 +1,3 @@
 scripts/lbl/lbl.cfg
 tests/.tmp/
+tests/.btest.failed.dat

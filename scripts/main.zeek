@@ -190,7 +190,7 @@ export {
 	const intel_source = "offensive.agency";
 
 	## Version string sent in the User-Agent of feed requests.
-	const version = "1.0.0";
+	const version = "1.0.1";
 
 	# -----------------------------------------------------------------
 	# Feed context, kept on the authoritative node (filled by feed.zeek).

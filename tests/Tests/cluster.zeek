@@ -26,7 +26,7 @@
 # @TEST-EXEC: zeek-cut note msg src dst < manager/notice.log | sort > notices.txt
 # @TEST-EXEC: btest-diff notices.txt
 # JSON mirror written by the same Log::write on the logger:
-# @TEST-EXEC: test "$(wc -l < manager/json-out/offensive_agency.log)" = "13"
+# @TEST-EXEC: test $(wc -l < manager/json-out/offensive_agency.log) -eq 13
 # @TEST-EXEC: grep -q '"note":"OffensiveAgency::Agent_Implant_Or_Webshell"' manager/json-out/offensive_agency.log
 
 # @TEST-START-FILE common.zeek
