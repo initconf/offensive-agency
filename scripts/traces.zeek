@@ -107,6 +107,12 @@ export {
 			$pat=/^Mozilla\/5\.0 \(Windows NT 10\.0; Win64; x64\) AppleWebKit\/537\.36$/,
 			$desc="truncated Chrome User-Agent used by several agents", $weak=T],
 
+		# Not matched on its own (field "pair"): raised by the pairing check
+		# in http_header below, when a weak implant trait comes with the
+		# implant's check-in or task-poll request.
+		["cyberstrikeai-implant-checkin"] = [$agent="cyberstrikeai", $field="pair", $role="implant",
+			$pat=/./, $desc="CyberStrikeAI implant check-in (truncated Chrome User-Agent or X-Session-Token on POST /check_in or GET /tasks?session_id=)"],
+
 		# ---------------- Header names ----------------
 		["implant-token-hdr"] = [$agent="cyberstrikeai|neurosploit", $field="header-name", $role="implant",
 			$pat=/^X-IMPLANT-TOKEN$/, $desc="C2 beacon header X-Implant-Token"],
@@ -178,6 +184,22 @@ export {
 }
 
 global rebuild_index: event();
+
+# CyberStrikeAI implant traits (internal/c2/payload_builder.go, beacon.go.tmpl,
+# payload_oneliner.go): each is weak alone, the pair is the implant.
+const implant_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+const implant_session_token = /^[0-9a-fA-F]{64}$/;
+
+## T if this request is a CyberStrikeAI implant check-in or task poll.
+function implant_request(c: connection): bool
+	{
+	if ( ! c?$http || ! c$http?$method || ! c$http?$uri )
+		return F;
+	local m = c$http$method;
+	local u = c$http$uri;
+	return (m == "POST" && /^\/check_in(\?|$)/ in u) ||
+	       (m == "GET" && /^\/tasks\?session_id=/ in u);
+	}
 
 # Signatures split by field for fast dispatch, plus one union pattern per
 # field so the common case (no match) costs a single regex test.
@@ -301,6 +323,21 @@ event http_header(c: connection, is_orig: bool, original_name: string,
 		return;
 
 	local sid = "";
+
+	# Two weak traits of the CyberStrikeAI implant become one strong
+	# finding when they come with its check-in/task-poll request.
+	if ( ((name == "USER-AGENT" && value == implant_ua) ||
+	      (name == "X-SESSION-TOKEN" && implant_session_token in value)) &&
+	     "cyberstrikeai-implant-checkin" !in disabled_signatures &&
+	     implant_request(c) )
+		{
+		if ( name == "USER-AGENT" )
+			emit(c, "cyberstrikeai-implant-checkin", "ua", value);
+		else
+			emit(c, "cyberstrikeai-implant-checkin", "header", name);
+		return;
+		}
+
 	if ( name == "USER-AGENT" )
 		{
 		sid = match_sig("ua", value, name);

@@ -11,5 +11,6 @@
 
 @load ./main
 @load ./feed
+@load ./threatdefence
 @load ./intel-match
 @load ./traces

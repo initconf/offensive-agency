@@ -27,6 +27,14 @@
 # Fetch through a proxy (curl -x syntax). Empty = direct (or https_proxy env).
 #OffensiveAgency::fetch_proxy       http://proxy.example.org:3128
 
+# --- ThreatDefence source (optional) ----------------------------------------
+# TSV written by tools/fetch-threatdefence.sh from cron. Empty = off.
+#OffensiveAgency::td_file           /var/lib/zeek/offensive-agency/threatdefence.tsv
+#OffensiveAgency::td_min_confidence medium
+# Replaces the built-in list of generic services (see threatdefence.zeek).
+#OffensiveAgency::td_ignore_indicators webhook.site,dnslog.cn,api.anthropic.com
+#OffensiveAgency::td_skip_context   vpn exit,proxy address
+
 # --- Noise controls ----------------------------------------------------------
 # "confirmed" = two independent fingerprint families; "probable" = one.
 #OffensiveAgency::min_level         confirmed

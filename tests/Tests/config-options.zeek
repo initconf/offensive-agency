@@ -2,7 +2,7 @@
 #
 # Config: min_level=probable (45.33.1.22 becomes watched), include_cdn_ips=T
 # (45.33.1.20 becomes watched), ignore_hosts silences 10.1.1.5, port 443 inbound
-# is log-only, and the HexStrike User-Agent signature is disabled.
+# is low-confidence only (Agent_Low_Confidence), and the HexStrike User-Agent signature is disabled.
 #
 # @TEST-EXEC: zeek -C -r $TRACES/offensive-agency.pcap $PACKAGE/__load__.zeek %INPUT
 # @TEST-EXEC: zeek-cut kind indicator direction local_host remote_host note < offensive_agency.log > hits.txt
@@ -14,7 +14,7 @@
 # @TEST-EXEC: grep -q '45.33.1.20.*Outbound_To_Agent_Host' hits.txt
 # @TEST-EXEC: ! grep -q '10.1.1.5	' hits.txt
 # @TEST-EXEC: ! grep -q 'hexstrike-ua' hits.txt
-# @TEST-EXEC: grep -q '45.33.1.11.*inbound.*-$' hits.txt
+# @TEST-EXEC: grep -q '45.33.1.11.*inbound.*Agent_Low_Confidence$' hits.txt
 
 @TEST-START-FILE oa.cfg
 OffensiveAgency::min_level	probable

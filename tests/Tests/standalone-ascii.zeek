@@ -2,7 +2,7 @@
 #
 # @TEST-EXEC: zeek -C -r $TRACES/offensive-agency.pcap $PACKAGE/__load__.zeek $TEST_FILES/feed-ready.zeek %INPUT
 # @TEST-EXEC: test "$(grep -vc '^#' offensive_agency.log)" = "13"
-# @TEST-EXEC: test "$(grep -vc '^#' notice.log)" = "10"
+# @TEST-EXEC: test "$(grep -vc '^#' notice.log)" = "13"
 # @TEST-EXEC: zeek-cut kind indicator direction local_host remote_host agents note < offensive_agency.log > hits.txt
 # @TEST-EXEC: btest-diff hits.txt
 # @TEST-EXEC: zeek-cut note msg src dst < notice.log > notices.txt

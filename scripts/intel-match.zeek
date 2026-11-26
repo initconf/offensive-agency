@@ -17,6 +17,7 @@
 @load policy/frameworks/intel/seen/ssl
 @load policy/frameworks/intel/seen/http-headers
 @load ./main
+@load ./threatdefence
 
 module OffensiveAgency;
 
@@ -47,13 +48,24 @@ event Intel::match(s: Intel::Seen, items: set[Intel::Item])
 	if ( ! is_authority() )
 		return;
 
+	# offensive.agency wins when both sources list the indicator; the
+	# ThreatDefence context is appended below.
 	local agents = "";
+	local src = "";
 	for ( it in items )
+		{
 		if ( it$meta$source == intel_source )
 			{
 			agents = it$meta?$oa_agents ? it$meta$oa_agents : it$meta$desc;
+			src = intel_source;
 			break;
 			}
+		if ( it$meta$source == td_intel_source && it$meta?$oa_agents )
+			{
+			agents = it$meta$oa_agents;
+			src = td_intel_source;
+			}
+		}
 
 	if ( agents == "" )
 		return;
@@ -66,6 +78,9 @@ event Intel::match(s: Intel::Seen, items: set[Intel::Item])
 	              $seen_where=cat(s$where), $indicator=s$indicator);
 	if ( s?$oa_uid )
 		h$uid = s$oa_uid;
+	if ( src == td_intel_source )
+		h$source = td_intel_source;
+	local td_ctx = "";
 
 	if ( s$indicator_type == Intel::ADDR )
 		{
@@ -100,6 +115,8 @@ event Intel::match(s: Intel::Seen, items: set[Intel::Item])
 
 		if ( ip in feed_hosts )
 			h$context = feed_hosts[ip]$context;
+		if ( ip in td_hosts )
+			td_ctx = td_hosts[ip];
 		}
 	else if ( s$indicator_type == Intel::DOMAIN )
 		{
@@ -120,9 +137,14 @@ event Intel::match(s: Intel::Seen, items: set[Intel::Item])
 
 		if ( dn in feed_domains )
 			h$context = feed_domains[dn]$context;
+		if ( dn in td_domains )
+			td_ctx = td_domains[dn];
 		}
 	else
 		return;
+
+	if ( td_ctx != "" )
+		h$context = h?$context ? fmt("%s; %s", h$context, td_ctx) : td_ctx;
 
 	event OffensiveAgency::hit(h);
 	}

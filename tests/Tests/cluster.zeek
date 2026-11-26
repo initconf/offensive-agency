@@ -20,7 +20,7 @@
 #
 # Exactly the standalone result, despite two workers seeing everything:
 # @TEST-EXEC: test "$(grep -vc '^#' manager/offensive_agency.log)" = "13"
-# @TEST-EXEC: test "$(grep -vc '^#' manager/notice.log)" = "10"
+# @TEST-EXEC: test "$(grep -vc '^#' manager/notice.log)" = "13"
 # @TEST-EXEC: zeek-cut kind indicator direction local_host remote_host agents note < manager/offensive_agency.log | sort > hits.txt
 # @TEST-EXEC: btest-diff hits.txt
 # @TEST-EXEC: zeek-cut note msg src dst < manager/notice.log | sort > notices.txt

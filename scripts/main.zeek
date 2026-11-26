@@ -62,6 +62,11 @@ export {
 		Local_Host_Listed,
 		## The feed could not be fetched or parsed, or its data is stale.
 		Feed_Problem,
+		## Every other finding: weak signatures, transit traffic (neither
+		## end local), inbound contacts on inbound_ignore_ports, inbound
+		## OAST/operator traces. In notice.log for context like everything
+		## else, but meant to be logged only: not emailed, not dropped.
+		Agent_Low_Confidence,
 	};
 
 	## One finding. Built on the node that saw it, fully serialized, and
@@ -92,6 +97,9 @@ export {
 		weak:        bool     &default=F;
 		## The notice raised for this hit, if any.
 		note:        Notice::Type &log &optional;
+		## Indicator source when it is not offensive.agency
+		## ("threatdefence", see threatdefence.zeek).
+		source:      string   &log &optional;
 	};
 
 	## Routed to the authoritative node (manager / standalone process).
@@ -102,6 +110,10 @@ export {
 
 	## Raised on the authoritative node after a feed load was applied.
 	global feed_updated: event(n_ips: count, n_domains: count);
+
+	## Raised once on the authoritative node when the config files have
+	## been read and indicator sources may start loading.
+	global sources_ready: event();
 
 	# -----------------------------------------------------------------
 	# Config framework options. Set these in a config file loaded via
@@ -169,8 +181,9 @@ export {
 	option ignore_indicators: set[string] = {};
 
 	## Inbound connections from listed hosts to these local ports are
-	## logged but not noticed (e.g. 25/tcp if agent boxes that also run
-	## mail servers deliver mail to you).
+	## raised as Agent_Low_Confidence instead of Inbound_From_Agent_Host
+	## (e.g. 25/tcp if agent boxes that also run mail servers deliver mail
+	## to you).
 	option inbound_ignore_ports: set[port] = {};
 
 	## Behavioural signature ids to disable (see traces.zeek).
@@ -190,7 +203,7 @@ export {
 	const intel_source = "offensive.agency";
 
 	## Version string sent in the User-Agent of feed requests.
-	const version = "1.0.1";
+	const version = "1.0.0";
 
 	# -----------------------------------------------------------------
 	# Feed context, kept on the authoritative node (filled by feed.zeek).
@@ -259,70 +272,79 @@ function direction_of(id: conn_id): string
 	}
 
 ## Decide the notice type (if any) for a hit. Returns F to log only.
-function decide(h: Hit): bool
+function decide(h: Hit)
 	{
 	switch ( h$kind ) {
 	case "local_listed":
 		h$note = Local_Host_Listed;
-		return T;
+		return;
 
 	case "feed":
 		h$note = Feed_Problem;
-		return T;
+		return;
 
 	case "ip":
 		if ( h$direction == "inbound" )
 			{
 			if ( h?$id && h$id$resp_p in inbound_ignore_ports )
-				return F;
+				{
+				h$note = Agent_Low_Confidence;
+				return;
+				}
 			h$note = Inbound_From_Agent_Host;
-			return T;
+			return;
 			}
 		if ( h$direction == "outbound" )
 			{
 			h$note = Outbound_To_Agent_Host;
-			return T;
+			return;
 			}
-		return F;
+		# Transit: neither end is local.
+		h$note = Agent_Low_Confidence;
+		return;
 
 	case "domain":
 		h$note = Agent_Domain_Contact;
-		return T;
+		return;
 	}
 
 	# Behavioural signatures.
 	if ( h$role == "implant" || h$role == "webshell" )
 		{
 		h$note = Agent_Implant_Or_Webshell;
-		return T;
+		return;
 		}
 
 	if ( h$weak )
-		return F;
+		{
+		h$note = Agent_Low_Confidence;
+		return;
+		}
 
 	if ( h$role == "oast" )
 		{
 		if ( h$direction == "outbound" || h$direction == "internal" )
 			{
 			h$note = OAST_Callback_Lookup;
-			return T;
+			return;
 			}
-		return F;
+		h$note = Agent_Low_Confidence;
+		return;
 		}
 
 	if ( h$direction == "outbound" || h$direction == "internal" )
 		{
 		h$note = Agent_Running_Locally;
-		return T;
+		return;
 		}
 
 	if ( h$direction == "inbound" && h$role == "attack" )
 		{
 		h$note = Agent_Activity_Inbound;
-		return T;
+		return;
 		}
 
-	return F;
+	h$note = Agent_Low_Confidence;
 	}
 
 ## The logical identity of a finding: what a human would call "the same
@@ -337,6 +359,8 @@ function dedup_key(h: Hit): string
 	case "ip":
 		if ( h$direction == "inbound" )
 			return fmt("ip-in|%s", rh);
+		if ( h$direction == "transit" )
+			return fmt("ip-transit|%s", rh);
 		return fmt("ip-out|%s|%s", rh, lh);
 	case "domain":
 		return fmt("domain|%s|%s", h$indicator, lh);
@@ -358,6 +382,27 @@ function dedup_key(h: Hit): string
 function notice_msg(h: Hit): string
 	{
 	local rp = h?$id ? cat(h$id$resp_p) : "";
+
+	if ( h?$source && h$source == "threatdefence" )
+		{
+		switch ( h$note ) {
+		case Outbound_To_Agent_Host:
+			return fmt("%s connected to %s:%s, infrastructure reported in offensive AI agent attacks (%s)",
+			           h$local_host, h$remote_host, rp, h$agents);
+		case Inbound_From_Agent_Host:
+			return fmt("Host %s, reported in offensive AI agent attacks (%s), connected to %s:%s%s",
+			           h$remote_host, h$agents, h$local_host, rp,
+			           h$seen_where == "HTTP::IN_X_FORWARDED_FOR_HEADER" ? " (via X-Forwarded-For)" : "");
+		case Agent_Domain_Contact:
+			return fmt("%s used domain %s, reported in offensive AI agent attacks (%s), in %s",
+			           h$local_host, h$indicator, h$agents, h$seen_where);
+		case Local_Host_Listed:
+			return fmt("Local host %s is listed in a report of offensive AI agent attacks (%s)",
+			           h$indicator, h$agents);
+		default:
+			break;
+		}
+		}
 
 	switch ( h$note ) {
 	case Outbound_To_Agent_Host:
@@ -391,6 +436,16 @@ function notice_msg(h: Hit): string
 		           h$indicator, h$agents);
 	case Feed_Problem:
 		return fmt("offensive.agency feed problem: %s", h$context);
+	case Agent_Low_Confidence:
+		local who = "";
+		if ( h?$remote_host && h?$local_host )
+			who = h$direction == "inbound" ? fmt("%s -> %s", h$remote_host, h$local_host)
+			                               : fmt("%s -> %s", h$local_host, h$remote_host);
+		else if ( h?$id )
+			who = fmt("%s -> %s", h$id$orig_h, h$id$resp_h);
+		local what = h?$sig_desc ? h$sig_desc : h$indicator;
+		return fmt("Low-confidence offensive AI agent finding (%s%s, %s): %s %s",
+		           h$kind, h$weak ? ", weak signature" : "", h$direction, who, what);
 	}
 	return "offensive.agency finding";
 	}
@@ -417,17 +472,22 @@ event OffensiveAgency::hit(h: Hit) &priority=5
 			h$context = fmt("%s; remote is a listed agent host: %s", h$context, fh$context);
 		}
 
+	# Every finding is both logged and raised as a notice (scan-NG style):
+	# notice.log is the one place to look, and the site's Notice::policy
+	# decides email/drop. Low-value findings get Agent_Low_Confidence.
+	decide(h);
+
+	# A weak signature, or a listed host's contact on an ignored port, must
+	# never use up (and so suppress) the real finding for the same key.
 	local key = dedup_key(h);
+	if ( h$note == Agent_Low_Confidence &&
+	     (h$weak || (h$kind == "ip" && h$direction == "inbound")) )
+		key = "low|" + key;
 	if ( key in seen_keys )
 		return;
 	add seen_keys[key];
 
-	local do_notice = decide(h);
-
 	Log::write(OffensiveAgency::LOG, h);
-
-	if ( ! do_notice )
-		return;
 
 	local n = Notice::Info($note=h$note, $msg=notice_msg(h),
 	                       $identifier=key, $suppress_for=dedup_interval);

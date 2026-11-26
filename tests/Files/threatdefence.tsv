@@ -1,0 +1,13 @@
+#separator \x09
+#fields	value	ioc_type	confidence	actor	context	source_url	review_by	framework
+91.92.1.10	ipv4	medium	ARTEX operators	ARTEX command and control	https://example.org/report-a	2099-01-01	artex
+91.92.1.11	ipv4	high	Storm-test	Attack source on IT vendors	https://example.org/report-b	-	artex cairn
+91.92.1.12	ipv4	low	ARTEX operators	Exposed console (sample list)	https://example.org/report-c	-	artex
+91.92.1.13	ipv4	medium	ARTEX operators	Old staging server	https://example.org/report-d	2020-01-01	artex
+91.92.1.14	ipv4	medium	Storm-test	VPN exits, relevant to one day only	https://example.org/report-e	2099-01-01	artex
+91.92.1.64/26	ipv4	medium	ARTEX operators	Hosting range	https://example.org/report-f	2099-01-01	artex
+45.33.1.10	ipv4	medium	ARTEX operators	ARTEX console also in a report	https://example.org/report-g	2099-01-01	artex
+10.2.1.250	ipv4	medium	ARTEX operators	Compromised host used as relay	https://example.org/report-h	2099-01-01	artex
+cdn.skimmer-test.example	domain	high	Gambit test	Skimmer host	https://example.org/report-i	-	-
+webhook.site	domain	medium	ARTEX operators	Legitimate request-collection service	https://example.org/report-j	-	artex
+update.pentagi.com	domain	medium	Related	PentAGI update service	https://example.org/report-k	-	pentagi

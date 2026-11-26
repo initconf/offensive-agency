@@ -255,8 +255,10 @@ function fetch()
 
 		if ( consecutive_failures >= failures_before_notice )
 			feed_problem("fetch-failed",
-			             fmt("%d consecutive failures fetching %s%s (curl rc=%s http=%s); using cached data",
-			                 consecutive_failures, feed_url, via, rc, code));
+			             fmt("%d consecutive failures fetching %s%s (curl rc=%s http=%s); %s",
+			                 consecutive_failures, feed_url, via, rc, code,
+			                 |feed_hosts| > 0 ? fmt("using cached data (%d hosts)", |feed_hosts|) :
+			                 "NO indicators loaded: nothing is being watched (no egress? set fetch_proxy, or feed_file + tools/fetch-feed.sh)"));
 		}
 	}
 
@@ -508,6 +510,7 @@ function start()
 	if ( started )
 		return;
 	started = T;
+	event OffensiveAgency::sources_ready();
 
 	schedule 1 hr { OffensiveAgency::health_check() };
 

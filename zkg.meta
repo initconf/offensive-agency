@@ -17,7 +17,7 @@ description =
     .
     All tunables are Config framework options (no redef needed). An opt-in
     LBL site add-on (offensive-agency/lbl) adds site values and notice actions.
-version = 1.0.1
+version = 1.1.0
 script_dir = scripts
 tags =
     intel

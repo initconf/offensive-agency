@@ -23,6 +23,9 @@ Following functionality is provided by the package
            markers, update/telemetry endpoints, OAST callback lookups.
         4) Your own address in the feed: Local_Host_Listed.
         5) Feed health: Feed_Problem on repeated fetch failures or stale data.
+        6) Optional second source: ThreatDefence's report-sourced IoCs (actor
+           C2, payload, skimmer and attack-source hosts that a console feed
+           cannot see), same notices, same dedup. See *ThreatDefence source*.
 
 Installation
 ------------
@@ -63,6 +66,10 @@ option                             default     purpose
 ``refresh_interval``               30 min      feed poll period (304 when nothing changed)
 ``feed_file``                      ""          read a local NDJSON copy instead of HTTP
 ``fetch_proxy``                    ""          HTTP(S)/SOCKS proxy for the fetch (curl -x)
+``td_file``                        ""          ThreatDefence TSV (fetch-threatdefence.sh)
+``td_min_confidence``              medium      ThreatDefence rows at or above this
+``td_ignore_indicators``           (services)  ThreatDefence values never to watch
+``td_skip_context``                vpn, proxy  skip rows whose context says shared
 =================================  ==========  ===========================================
 
 Notices
@@ -85,6 +92,8 @@ OAST_Callback_Lookup              local host resolved dnslog.cn / interactsh: a 
                                   injection probably landed
 Local_Host_Listed                 one of YOUR addresses runs an exposed agent console             address
 Feed_Problem                      fetch failures, empty/shrunk feed, stale data                   problem
+Agent_Low_Confidence              everything else: weak signatures, transit, ignored inbound       per finding
+                                  ports. For context; site policy should only log it
 ================================  ============================================================  ===========
 
 ``$src`` is the address to act on: the remote end for inbound findings, the
@@ -98,7 +107,9 @@ Example::
           sub: net=hosting AS64500 NL Example Hosting co-hosted C2=Sliver seen=2026-11-10..2026-11-24
                https://www.offensive.agency/host/45.33.1.10
 
-Every finding, noticed or not, is in ``offensive_agency.log`` (kind, indicator,
+Every finding is raised as a notice (one place to look, like scan-NG), and
+the site's ``Notice::policy`` decides email/drop. Every finding is also in
+``offensive_agency.log`` (kind, indicator,
 direction, local/remote host, agents, role, context, note). Intel matches also
 appear in the standard ``intel.log`` with source ``offensive.agency``.
 
@@ -112,12 +123,15 @@ How false positives are kept down
           active window. Ages are measured against the feed's newest day.
         - IPs match on ESTABLISHED TCP only: SYN scans and backscatter from
           listed hosts never fire.
-        - Transit traffic (neither end local) is logged, never noticed.
+        - Transit traffic (neither end local) is only Agent_Low_Confidence.
         - Behavioural signatures were curated from the agents' traces: generic
           traits (stock nuclei/sqlmap UAs, python-requests bursts, PentAGI's
           28000-29999 return ports) were left out. Borderline ones (the
           truncated "...AppleWebKit/537.36" UA, the public PHP-PoC boundary)
-          are marked weak: logged, never noticed.
+          are marked weak: only Agent_Low_Confidence. A weak trait is
+          upgraded only when paired with its implant's own request (the
+          truncated UA or a 64-hex X-Session-Token on CyberStrikeAI's
+          POST /check_in or GET /tasks?session_id=).
         - One notice per logical finding per day, decided on a single node.
         - Your own listed hosts are reported, never inserted as indicators.
         - A feed that shrinks by more than half is applied additively only.
@@ -164,6 +178,34 @@ cron do the fetching and keep the manager off the network entirely::
 every ``refresh_interval``. If the cron job stops working, ``Feed_Problem``
 (stale-data) fires once the newest entry is older than ``stale_after`` + 1 day.
 
+ThreatDefence source
+--------------------
+`ThreatDefence/agentic-attack-detections
+<https://github.com/ThreatDefence/agentic-attack-detections>`_ (MIT) curates
+indicators from published reports of attacks by offensive AI agents
+(Datadog, Microsoft, Wiz, CrowdStrike, Team Cymru, ...). Its IPs and domains
+are operator infrastructure, not exposed consoles, so they barely overlap
+with the offensive.agency feed. Off by default; enable with cron plus one
+option::
+
+        23 */6 * * *  /path/to/offensive-agency/tools/fetch-threatdefence.sh /var/lib/zeek/oa [PROXY]
+        OffensiveAgency::td_file   /var/lib/zeek/oa/threatdefence.tsv
+
+The script (needs ``python3``) fetches ``iocs/indicators.csv`` with an ETag,
+keeps the IPv4 and domain rows, and writes the TSV atomically. Zeek re-reads
+it every ``refresh_interval`` and syncs the Intel framework (source
+``threatdefence``, inserts and removals). Filters, applied in Zeek so they
+can change at runtime: confidence >= ``td_min_confidence``, IP rows past
+upstream's ``review_by`` date, ranges, ``td_ignore_indicators`` (AI model
+APIs, webhook.site, dnslog.cn, LLM relays, GitHub), rows whose context says
+VPN exit or proxy, and domains a behavioural signature already covers.
+
+Hits use the usual notice types (Outbound_To_Agent_Host,
+Inbound_From_Agent_Host, Agent_Domain_Contact) with a message that says
+"reported in offensive AI agent attacks", ``agents`` like ``artex:td-medium``,
+``source=threatdefence`` in offensive_agency.log, and the report URL in
+``$sub``. An address in both sources gives one notice with both contexts.
+
 LBL add-on
 ----------
 Not loaded by default. At LBL::
@@ -171,22 +213,25 @@ Not loaded by default. At LBL::
         @load offensive-agency
         @load offensive-agency/lbl
 
-Site settings (authorised scanners in ignore_hosts, never-drop nets) live in
-a config file kept outside the package. The package ships only
-``scripts/lbl/lbl.cfg.example`` with placeholder addresses; copy it, fill it
-in, and register it in local.zeek::
+Site settings (feed/ThreatDefence file locations, authorised scanners in
+``ignore_hosts``, ``lbl_drop_inbound``, never-drop nets) live in a config
+file kept outside the package. The package ships only
+``scripts/lbl/lbl.cfg.example`` with placeholder values; copy it, fill it in,
+and register it in local.zeek::
 
         redef Config::config_files += { "/path/to/lbl.cfg" };
 
-Host-specific values such as ``state_dir`` go in a per-host override config
-file.
+The add-on also loads ``scripts/lbl/notice-policy.zeek``: ACTION_LOG
+(notice.log, no notice_alarm.log) for every finding; ACTION_EMAIL for
+implant, local-listed, running-locally, outbound, domain, OAST and feed
+problems; ACTION_DROP for external inbound sources only when
+``lbl_drop_inbound`` is T. Drops are carried out by the site's existing drop
+machinery (e.g. NetControl).
 
-The add-on also installs a notice policy: ACTION_ALARM for every finding; ACTION_EMAIL for implant,
-local-listed, running-locally, outbound, domain, OAST and feed problems;
-ACTION_DROP for external inbound sources only when ``lbl_drop_inbound`` is T.
-Set that in a separate site override config file (never in the site config file as well:
-the Config framework does not order files). Drops are carried out by the
-existing ``lbl.drop-action.zeek``.
+Each option lives in exactly one config file (the Config framework does not
+order files). Host-specific values such as ``state_dir`` go in a separate
+per-host config file that does not repeat site options. If a shared feed
+copy stops being refreshed, every cluster raises ``Feed_Problem`` (stale-data).
 
 Tests
 -----
@@ -195,7 +240,8 @@ Tests
         cd tests && btest
 
 Standalone TSV + JSON, Config-file options, feed failure, proxy fetch,
-LBL add-on, and a
+LBL add-on, ThreatDefence source and implant pairing (``extra.pcap``,
+``make-trace-extra.py``), and a
 real ZeroMQ cluster (manager, proxy, two workers both replaying the same trace;
 every finding must still appear exactly once). The trace is synthetic and is
 regenerated by ``tests/Traces/make-trace.py`` (scapy).
@@ -203,3 +249,6 @@ regenerated by ``tests/Traces/make-trace.py`` (scapy).
 Attribution
 -----------
 Feed data: offensive.agency, data by ONYPHE. Free to use; please credit both.
+Optional second source: ThreatDefence agentic-attack-detections, MIT
+license, Copyright (c) ThreatDefence; the CyberStrikeAI check-in pairing
+follows their analysis of the CyberStrikeAI source.
